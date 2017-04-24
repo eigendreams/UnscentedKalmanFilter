@@ -54,8 +54,8 @@ UKF::UKF() {
 	 */
 
 	is_initialized_ = false;
-	x_ < 	0, 0, 0, 0, 0;
-	P_ < 	1, 0, 0, 0, 0,
+	x_ << 	0, 0, 0, 0, 0;
+	P_ << 	1, 0, 0, 0, 0,
 			0, 1, 0, 0, 0,
 			0, 0, 1, 0, 0,
 			0, 0, 0, 1, 0,
@@ -188,19 +188,21 @@ void UKF::Prediction(double delta_t) {
 	MatrixXd P_root = P_pred.sqrt();
 
 	// Generate the sigma points
-	std::list<VectorXd> Xsig_pred_aug;
+	std::vector<VectorXd> Xsig_pred_aug;
 	Xsig_pred_aug.resize(1 + 2 * n_aug_);
 	// We will create points as vectors on the fly
-	Xsig_pred_aug(0) = x_pred_aug;
+	Xsig_pred_aug[0] = x_pred_aug;
 	for ( int idx = 0; idx < n_aug_; idx ++ )
 	{
-		Xsig_pred_aug(1 + 2 * idx) 	   = x_pred_aug + sqrt(lambda_ + n_aug_) * P_root.col(idx);
-		Xsig_pred_aug(1 + 2 * idx + 1) = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
+		Xsig_pred_aug[1 + 2 * idx] 	   = x_pred_aug + sqrt(lambda_ + n_aug_) * P_root.col(idx);
+		Xsig_pred_aug[1 + 2 * idx + 1] = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
 	}
 
 	// Pass the sigma points through model
-	for ( auto point : Xsig_pred_aug )
+	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
 	{
+		VectorXd point = Xsig_pred_[idx];
+
 		float dt2 = delta_t * delta_t;
 
 		// assign init original values to predictions
@@ -247,21 +249,22 @@ void UKF::Prediction(double delta_t) {
 		// But it will be an issue during the measurement!
 		while ( yaw_pred > M_PI )
 			yaw_pred = yaw_pred - M_PI;
-		while ( yaw_pred(1) < -M_PI )
+		while ( yaw_pred < -M_PI )
 			yaw_pred = yaw_pred + M_PI;
 
 		// assign to point, last values will be ignored later
 		point << px_pred, py_pred, v_pred, yaw_pred, dyaw_pred, 0, 0;
+		Xsig_pred_[idx] = point;
 	}
 
 	// Revert to lower dimensionality
-	for ( int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
 	{
-		Xsig_pred_(idx) << 	Xsig_pred_aug(idx)(0),
-							Xsig_pred_aug(idx)(1),
-							Xsig_pred_aug(idx)(2),
-							Xsig_pred_aug(idx)(3),
-							Xsig_pred_aug(idx)(4);
+		Xsig_pred_[idx] << 	Xsig_pred_aug[idx](0),
+							Xsig_pred_aug[idx](1),
+							Xsig_pred_aug[idx](2),
+							Xsig_pred_aug[idx](3),
+							Xsig_pred_aug[idx](4);
 	}
 
 	// Get middle points, first populate list of weights
@@ -275,23 +278,23 @@ void UKF::Prediction(double delta_t) {
 	// Calculate new mean
 	VectorXd x_pred = x_;
 	x_pred << 0, 0, 0, 0, 0;
-	for ( int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
 	{
-		x_pred += weights_(idx) * Xsig_pred_(idx);
+		x_pred += weights_(idx) * Xsig_pred_[idx];
 	}
 
 	// Calculate new P
-	MatrixXd P_pred = P_;
-	P_pred.setZero();
-	for ( int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	MatrixXd P_new = P_;
+	P_new.setZero();
+	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
 	{
-		VectorXd x_diff =  Xsig_pred_(idx) - x_pred;
-		P_pred += weights_(idx) * x_diff * x_diff.transpose();
+		VectorXd x_diff =  Xsig_pred_[idx] - x_pred;
+		P_new += weights_(idx) * x_diff * x_diff.transpose();
 	}
 
 	// Set back into model
 	x_ = x_pred;
-	P_ = P_pred;
+	P_ = P_new;
 }
 
 /**
@@ -307,7 +310,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
 	 */
-	std::list<VectorXd> Z_list;
+	std::vector<VectorXd> Z_list;
 	Z_list.resize(15);
 	VectorXd zpred = VectorXd(2);
 
@@ -316,27 +319,27 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	{
 		// In the case of a lidar it is very simple
 		VectorXd zpred_i = VectorXd(2);
-		VectorXd xpred_i = Xsig_pred_(idx);
+		VectorXd xpred_i = Xsig_pred_[idx];
 
 		zpred_i(0) = xpred_i(0);
 		zpred_i(1) = xpred_i(1);
 
-		Z_list(idx) = zpred_i;
+		Z_list[idx] = zpred_i;
 	}
 
 	// Calculate mean z from points
 	zpred << 0, 0;
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		zpred += weights_(idx) * Z_list(idx);
+		zpred += weights_(idx) * Z_list[idx];
 	}
 
 	// Calculate S
 	MatrixXd S = MatrixXd(2, 2);
 	S.setZero();
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd z_diff = Z_list(idx) - zpred;
+		VectorXd z_diff = Z_list[idx] - zpred;
 		S += weights_(idx) * z_diff * z_diff.transpose();
 	}
 	S(0, 0) += std_laspx_ * std_laspx_;
@@ -345,10 +348,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 2);
 	T.setZero();
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd x_diff = Xsig_pred_(idx) - x_;
-		VectorXd z_diff = Z_list(idx) - zpred;
+		VectorXd x_diff = Xsig_pred_[idx] - x_;
+		VectorXd z_diff = Z_list[idx] - zpred;
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
 
@@ -379,7 +382,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
 	 */
-	std::list<VectorXd> Z_list;
+	std::vector<VectorXd> Z_list;
 	Z_list.resize(15);
 	// From x_ mean, but this is not used! ok.
 	VectorXd zpred = VectorXd(3);
@@ -389,7 +392,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	{
 		// In the case of a lidar it is very simple
 		VectorXd zpred_i = VectorXd(3);
-		VectorXd xpred_i = Xsig_pred_(idx);
+		VectorXd xpred_i = Xsig_pred_[idx];
 
 		float px  = xpred_i(0);
 		float py  = xpred_i(1);
@@ -410,24 +413,22 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		zpred_i(1) = phi;
 		zpred_i(2) = drho;
 
-		Z_list(idx) = zpred_i;
+		Z_list[idx] = zpred_i;
 	}
-
-
 
 	// Calculate mean z from points
 	zpred << 0, 0, 0;
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		zpred += weights_(idx) * Z_list(idx);
+		zpred += weights_(idx) * Z_list[idx];
 	}
 
 	// Calculate S
 	MatrixXd S = MatrixXd(3, 3);
 	S.setZero();
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd z_diff = Z_list(idx) - zpred;
+		VectorXd z_diff = Z_list[idx] - zpred;
 
 		while ( z_diff(1) > M_PI )
 			z_diff(1) = z_diff(1) - M_PI;
@@ -443,10 +444,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 3);
 	T.setZero();
-	for ( int idx = 0; idx < Z_list.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd x_diff = Xsig_pred_(idx) - x_;
-		VectorXd z_diff = Z_list(idx) - zpred;
+		VectorXd x_diff = Xsig_pred_[idx] - x_;
+		VectorXd z_diff = Z_list[idx] - zpred;
 
 		while ( z_diff(1) > M_PI )
 			z_diff(1) = z_diff(1) - M_PI;

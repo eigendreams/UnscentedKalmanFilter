@@ -31,7 +31,7 @@ public:
   MatrixXd P_;
 
   ///* predicted sigma points list
-  std::list<VectorXd> Xsig_pred_;
+  std::vector<VectorXd> Xsig_pred_;
 
   ///* time when the state is true, in us
   long long time_us_;
