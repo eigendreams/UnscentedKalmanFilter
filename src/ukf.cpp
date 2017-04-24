@@ -185,7 +185,7 @@ void UKF::Prediction(double delta_t) {
 	P_pred(5, 5) = std_a_ * std_a_;
 	P_pred(6, 6) = std_yawdd_ * std_yawdd_;
 	// Obtain roots of cov matrix, dunno if we should use Cholesky, as 7 is a low dimensionality
-	MatrixXd P_root( P_.llt().matrixL() );
+	MatrixXd P_root( P_pred.llt().matrixL() );
 
 	// Generate the sigma points
 	std::vector<VectorXd> Xsig_pred_aug;
@@ -199,9 +199,9 @@ void UKF::Prediction(double delta_t) {
 	}
 
 	// Pass the sigma points through model
-	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Xsig_pred_aug.size(); idx++ )
 	{
-		VectorXd point = Xsig_pred_[idx];
+		VectorXd point = Xsig_pred_aug[idx];
 
 		float dt2 = delta_t * delta_t;
 
@@ -254,17 +254,24 @@ void UKF::Prediction(double delta_t) {
 
 		// assign to point, last values will be ignored later
 		point << px_pred, py_pred, v_pred, yaw_pred, dyaw_pred, 0, 0;
-		Xsig_pred_[idx] = point;
+		Xsig_pred_aug[idx] = point;
 	}
 
 	// Revert to lower dimensionality
 	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
 	{
-		Xsig_pred_[idx] << 	Xsig_pred_aug[idx](0),
-							Xsig_pred_aug[idx](1),
-							Xsig_pred_aug[idx](2),
-							Xsig_pred_aug[idx](3),
-							Xsig_pred_aug[idx](4);
+		VectorXd point = VectorXd(5);
+		VectorXd point_aug = VectorXd(7);
+
+		point_aug = Xsig_pred_aug[idx];
+
+		point << 	point_aug(0),
+					point_aug(1),
+					point_aug(2),
+					point_aug(3),
+					point_aug(4);
+
+		Xsig_pred_[idx] = point;
 	}
 
 	// Get middle points, first populate list of weights
