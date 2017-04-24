@@ -72,7 +72,7 @@ UKF::UKF() {
 	NIS_radar_ = 0;
 	NIS_laser_ = 0;
 	//
-	Xsig_pred_.resize(1 + 2 * n_aug_);
+	Xsig_pred_ = MatrixXd(n_x_, 1 + 2 * n_aug_);
 }
 
 UKF::~UKF() {}
@@ -99,7 +99,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
 			float rho  = meas_package.raw_measurements_[0];
 			float phi  = meas_package.raw_measurements_[1];
-			float dphi = 0; // we do not know this as radar loses information!
 			float drho = meas_package.raw_measurements_[2];
 
 			float x = rho * cos(phi);
@@ -192,25 +191,22 @@ void UKF::Prediction(double delta_t) {
 	cout << "P_root = \n" << P_root << endl;
 
 	// Generate the sigma points
-	std::vector<VectorXd> Xsig_pred_aug;
-	Xsig_pred_aug.resize(1 + 2 * n_aug_);
+	MatrixXd Xsig_pred_aug;
+	Xsig_pred_aug = MatrixXd(n_aug_, 1 + 2 * n_aug_);
 	// We will create points as vectors on the fly
-	Xsig_pred_aug[0] = x_pred_aug;
+	Xsig_pred_aug.col(0) = x_pred_aug;
 	for ( int idx = 0; idx < n_aug_; idx ++ )
 	{
-		Xsig_pred_aug[1 + 2 * idx] 	   = x_pred_aug + sqrt(lambda_ + n_aug_) * P_root.col(idx);
-		Xsig_pred_aug[1 + 2 * idx + 1] = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
+		Xsig_pred_aug.col(1 + 2 * idx) 	   = x_pred_aug + sqrt(lambda_ + n_aug_) * P_root.col(idx);
+		Xsig_pred_aug.col(1 + 2 * idx + 1) = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
 	}
 
-	for (int idx = 0; idx < Xsig_pred_aug.size(); idx++)
-	{
-		cout << "xsigorig = \n" << Xsig_pred_aug[idx] << endl;
-	}
+	cout << "xsigorig = \n" << Xsig_pred_aug << endl;
 
 	// Pass the sigma points through model
-	for ( unsigned int idx = 0; idx < Xsig_pred_aug.size(); idx++ )
+	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		VectorXd point = Xsig_pred_aug[idx];
+		VectorXd point = Xsig_pred_aug.col(idx);
 
 		float dt2 = delta_t * delta_t;
 
@@ -263,16 +259,16 @@ void UKF::Prediction(double delta_t) {
 
 		// assign to point, last values will be ignored later
 		point << px_pred, py_pred, v_pred, yaw_pred, dyaw_pred, 0, 0;
-		Xsig_pred_aug[idx] = point;
+		Xsig_pred_aug.col(idx) = point;
 	}
 
 	// Revert to lower dimensionality
-	for ( unsigned int idx = 0; idx < Xsig_pred_aug.size(); idx++ )
+	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd point = VectorXd(5);
 		VectorXd point_aug = VectorXd(7);
 
-		point_aug = Xsig_pred_aug[idx];
+		point_aug = Xsig_pred_aug.col(idx);
 
 		point << 	point_aug(0),
 					point_aug(1),
@@ -280,13 +276,10 @@ void UKF::Prediction(double delta_t) {
 					point_aug(3),
 					point_aug(4);
 
-		Xsig_pred_[idx] = point;
+		Xsig_pred_.col(idx) = point;
 	}
 
-	for (int idx = 0; idx < Xsig_pred_.size(); idx++)
-	{
-		cout << "xsigpred = \n" << Xsig_pred_[idx] << endl;
-	}
+	cout << "xsigpred = \n" << Xsig_pred_ << endl;
 
 	// Get middle points, first populate list of weights
 	weights_(0) = (lambda_ / (lambda_ + n_aug_));
@@ -296,28 +289,24 @@ void UKF::Prediction(double delta_t) {
 		weights_(1 + 2 * idx + 1) = (0.5 * 1 / (lambda_ + n_aug_));
 	}
 
-	cout << "weights = \n" << weights_ << endl;
+	cout << "weights = \n" << weights_.transpose() << endl;
 
 	// Calculate new mean
 	VectorXd x_pred = x_;
 	x_pred << 0, 0, 0, 0, 0;
-	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		x_pred += weights_(idx) * Xsig_pred_[idx];
+		x_pred += weights_(idx) * Xsig_pred_.col(idx);
 	}
 
 	// Calculate new P
 	MatrixXd P_new = P_;
 	P_new.setZero();
-	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < 1 + 2* n_aug_; idx++ )
 	{
-		VectorXd x_diff =  Xsig_pred_[idx] - x_pred;
+		VectorXd x_diff =  Xsig_pred_.col(idx) - x_pred;
 		P_new += weights_(idx) * x_diff * x_diff.transpose();
 	}
-
-	// For debugging
-	cout << "x_orig = \n" << x_ << endl;
-	cout << "P_orig = \n" << P_ << endl;
 
 	// Set back into model
 	x_ = x_pred;
@@ -350,7 +339,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	{
 		// In the case of a lidar it is very simple
 		VectorXd zpred_i = VectorXd(2);
-		VectorXd xpred_i = Xsig_pred_[idx];
+		VectorXd xpred_i = Xsig_pred_.col(idx);
 
 		zpred_i(0) = xpred_i(0);
 		zpred_i(1) = xpred_i(1);
@@ -381,7 +370,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	T.setZero();
 	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd x_diff = Xsig_pred_[idx] - x_;
+		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
 		VectorXd z_diff = Z_list[idx] - zpred;
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
@@ -423,7 +412,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	{
 		// In the case of a lidar it is very simple
 		VectorXd zpred_i = VectorXd(3);
-		VectorXd xpred_i = Xsig_pred_[idx];
+		VectorXd xpred_i = Xsig_pred_.col(idx);
 
 		float px  = xpred_i(0);
 		float py  = xpred_i(1);
@@ -477,7 +466,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	T.setZero();
 	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
 	{
-		VectorXd x_diff = Xsig_pred_[idx] - x_;
+		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
 		VectorXd z_diff = Z_list[idx] - zpred;
 
 		while ( z_diff(1) > M_PI )
