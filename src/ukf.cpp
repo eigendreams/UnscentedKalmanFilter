@@ -185,7 +185,7 @@ void UKF::Prediction(double delta_t) {
 	P_pred(5, 5) = std_a_ * std_a_;
 	P_pred(6, 6) = std_yawdd_ * std_yawdd_;
 	// Obtain roots of cov matrix, dunno if we should use Cholesky, as 7 is a low dimensionality
-	MatrixXd P_root = P_pred.sqrt();
+	MatrixXd P_root( P_.llt().matrixL() );
 
 	// Generate the sigma points
 	std::vector<VectorXd> Xsig_pred_aug;
