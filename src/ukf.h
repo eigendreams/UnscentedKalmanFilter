@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <list>
 #include "tools.h"
 
 using Eigen::MatrixXd;
@@ -29,8 +30,8 @@ public:
   ///* state covariance matrix
   MatrixXd P_;
 
-  ///* predicted sigma points matrix
-  MatrixXd Xsig_pred_;
+  ///* predicted sigma points list
+  std::list<VectorXd> Xsig_pred_;
 
   ///* time when the state is true, in us
   long long time_us_;
