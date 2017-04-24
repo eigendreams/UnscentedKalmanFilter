@@ -55,12 +55,11 @@ UKF::UKF() {
 
 	is_initialized_ = false;
 	x_ << 	0, 0, 0, 0, 0;
-	P_ << 	1, 0, 0, 0, 0,
-			0, 1, 0, 0, 0,
-			0, 0, 1, 0, 0,
-			0, 0, 0, 1, 0,
-			0, 0, 0, 0, 1;
-	P_ = 1e6 * P_;
+	P_ << 	0.15 * 0.15, 0, 0, 0, 0,
+			0, 0.15 * 0.15, 0, 0, 0,
+			0, 0, 1.00 * 1.00, 0, 0,
+			0, 0, 0, 0.10 * 0.10, 0,
+			0, 0, 0, 0, 0.20 * 0.20;
 	time_us_ = 0;
 	std_a_ = 3;
 	std_yawdd_ = 0.2;
@@ -171,6 +170,8 @@ void UKF::Prediction(double delta_t) {
 	float yaw  = x_(3);
 	float dyaw = x_(4);
 
+	cout << "X = \n" << x_ << endl;
+
 	// state and cov matrix expansion
 	VectorXd x_pred_aug = VectorXd(n_aug_);
 	x_pred_aug << px, py, v, yaw, dyaw, 0, 0;
@@ -187,6 +188,9 @@ void UKF::Prediction(double delta_t) {
 	// Obtain roots of cov matrix, dunno if we should use Cholesky, as 7 is a low dimensionality
 	MatrixXd P_root( P_pred.llt().matrixL() );
 
+	cout << "P = \n" << P_pred << endl;
+	cout << "P_root = \n" << P_root << endl;
+
 	// Generate the sigma points
 	std::vector<VectorXd> Xsig_pred_aug;
 	Xsig_pred_aug.resize(1 + 2 * n_aug_);
@@ -196,6 +200,11 @@ void UKF::Prediction(double delta_t) {
 	{
 		Xsig_pred_aug[1 + 2 * idx] 	   = x_pred_aug + sqrt(lambda_ + n_aug_) * P_root.col(idx);
 		Xsig_pred_aug[1 + 2 * idx + 1] = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
+	}
+
+	for (int idx = 0; idx < Xsig_pred_aug.size(); idx++)
+	{
+		cout << "xsigorig = \n" << Xsig_pred_aug[idx] << endl;
 	}
 
 	// Pass the sigma points through model
@@ -215,7 +224,7 @@ void UKF::Prediction(double delta_t) {
 		float va        = point(5);
 		float vyawdd    = point(6);
 
-		if ( abs(dyaw_pred) < 1e-4 )
+		if ( abs(dyaw_pred) < 1e-3 )
 		{
 			// Assume 0 yaw rate locally, though only for calculation, old value will
 			// be carried over
@@ -258,7 +267,7 @@ void UKF::Prediction(double delta_t) {
 	}
 
 	// Revert to lower dimensionality
-	for ( unsigned int idx = 0; idx < Xsig_pred_.size(); idx++ )
+	for ( unsigned int idx = 0; idx < Xsig_pred_aug.size(); idx++ )
 	{
 		VectorXd point = VectorXd(5);
 		VectorXd point_aug = VectorXd(7);
@@ -274,13 +283,20 @@ void UKF::Prediction(double delta_t) {
 		Xsig_pred_[idx] = point;
 	}
 
+	for (int idx = 0; idx < Xsig_pred_.size(); idx++)
+	{
+		cout << "xsigpred = \n" << Xsig_pred_[idx] << endl;
+	}
+
 	// Get middle points, first populate list of weights
 	weights_(0) = (lambda_ / (lambda_ + n_aug_));
 	for ( int idx = 0; idx < n_aug_; idx ++ )
 	{
-		weights_(1 + 2 * idx) 	  = (0.5 * lambda_ / (lambda_ + n_aug_));
-		weights_(1 + 2 * idx + 1) = (0.5 * lambda_ / (lambda_ + n_aug_));
+		weights_(1 + 2 * idx) 	  = (0.5 * 1 / (lambda_ + n_aug_));
+		weights_(1 + 2 * idx + 1) = (0.5 * 1 / (lambda_ + n_aug_));
 	}
+
+	cout << "weights = \n" << weights_ << endl;
 
 	// Calculate new mean
 	VectorXd x_pred = x_;
@@ -299,9 +315,17 @@ void UKF::Prediction(double delta_t) {
 		P_new += weights_(idx) * x_diff * x_diff.transpose();
 	}
 
+	// For debugging
+	cout << "x_orig = \n" << x_ << endl;
+	cout << "P_orig = \n" << P_ << endl;
+
 	// Set back into model
 	x_ = x_pred;
 	P_ = P_new;
+
+	// For debugging
+	cout << "x_new = \n" << x_ << endl;
+	cout << "P_new = \n" << P_ << endl;
 }
 
 /**
