@@ -150,8 +150,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 	time_us_ = meas_package.timestamp_;
 
 	// print the output
-	cout << "x_ = " << x_ << endl;
-	cout << "P_ = " << P_ << endl;
+	//cout << "x_ = " << x_ << endl;
+	//cout << "P_ = " << P_ << endl;
 }
 
 /**
@@ -173,7 +173,7 @@ void UKF::Prediction(double delta_t) {
 	float yaw  = x_(3);
 	float dyaw = x_(4);
 
-	cout << "X = \n" << x_ << endl;
+	//cout << "X = \n" << x_ << endl;
 
 	// state and cov matrix expansion
 	VectorXd x_pred_aug = VectorXd(n_aug_);
@@ -191,8 +191,8 @@ void UKF::Prediction(double delta_t) {
 	// Obtain roots of cov matrix, dunno if we should use Cholesky, as 7 is a low dimensionality
 	MatrixXd P_root( P_pred.llt().matrixL() );
 
-	cout << "P = \n" << P_pred << endl;
-	cout << "P_root = \n" << P_root << endl;
+	//cout << "P = \n" << P_pred << endl;
+	//cout << "P_root = \n" << P_root << endl;
 
 	// Generate the sigma points
 	MatrixXd Xsig_pred_aug;
@@ -205,7 +205,7 @@ void UKF::Prediction(double delta_t) {
 		Xsig_pred_aug.col(1 + 2 * idx + 1) = x_pred_aug - sqrt(lambda_ + n_aug_) * P_root.col(idx);
 	}
 
-	cout << "xsigorig = \n" << Xsig_pred_aug << endl;
+	//cout << "xsigorig = \n" << Xsig_pred_aug << endl;
 
 	// Pass the sigma points through model
 	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
@@ -283,7 +283,7 @@ void UKF::Prediction(double delta_t) {
 		Xsig_pred_.col(idx) = point;
 	}
 
-	cout << "xsigpred = \n" << Xsig_pred_ << endl;
+	//cout << "xsigpred = \n" << Xsig_pred_ << endl;
 
 	// Get middle points, first populate list of weights
 	weights_(0) = (lambda_ / (lambda_ + n_aug_));
@@ -293,7 +293,7 @@ void UKF::Prediction(double delta_t) {
 		weights_(1 + 2 * idx + 1) = (0.5 * 1 / (lambda_ + n_aug_));
 	}
 
-	cout << "weights = \n" << weights_.transpose() << endl;
+	//cout << "weights = \n" << weights_.transpose() << endl;
 
 	// Calculate new mean
 	VectorXd x_pred = x_;
@@ -328,8 +328,8 @@ void UKF::Prediction(double delta_t) {
 	P_ = P_new;
 
 	// For debugging
-	cout << "x_new = \n" << x_ << endl;
-	cout << "P_new = \n" << P_ << endl;
+	//cout << "x_new = \n" << x_ << endl;
+	//cout << "P_new = \n" << P_ << endl;
 }
 
 /**
@@ -363,7 +363,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 		Z_list.col(idx) = x_model;
 	}
 
-	cout << "Z_sig = \n" << Z_list << endl;
+	//cout << "Z_sig = \n" << Z_list << endl;
 
 	// Calculate mean z from points
 	VectorXd zpred = VectorXd(2);
@@ -373,7 +373,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 		zpred += weights_(idx) * Z_list.col(idx);
 	}
 
-	cout << "Z_med = \n" << zpred << endl;
+	//cout << "Z_med = \n" << zpred << endl;
 
 	// Calculate S
 	MatrixXd S = MatrixXd(2, 2);
@@ -386,7 +386,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	S(0, 0) += std_laspx_ * std_laspx_;
 	S(1, 1) += std_laspy_ * std_laspy_;
 
-	cout << "S = \n" << S << endl;
+	//cout << "S = \n" << S << endl;
 
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 2);
@@ -404,19 +404,19 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
 
-	cout << "T = \n" << T << endl;
+	//cout << "T = \n" << T << endl;
 
 	// actual measurement
 	VectorXd zmeas = VectorXd(2);
 	zmeas(0) = meas_package.raw_measurements_(0);
 	zmeas(1) = meas_package.raw_measurements_(1);
 
-	cout << "Zmeas = \n" << zmeas << endl;
+	//cout << "Zmeas = \n" << zmeas << endl;
 
 	VectorXd zinnov = VectorXd(2);
 	zinnov = zmeas - zpred;
 
-	cout << "Zinnov = \n" << zinnov << endl;
+	//cout << "Zinnov = \n" << zinnov << endl;
 
 	MatrixXd K = T * S.inverse();
 	x_ = x_ + K * zinnov;
@@ -429,9 +429,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	P_ = P_ - K * S * K.transpose();
 	NIS_laser_ = zinnov.transpose() * S.inverse() * zinnov;
 
-	cout << "K = \n" << K << endl;
-	cout << "X = \n" << x_ << endl;
-	cout << "P = \n" << P_ << endl;
+	//cout << "K = \n" << K << endl;
+	//cout << "X = \n" << x_ << endl;
+	//cout << "P = \n" << P_ << endl;
 	cout << "e laser = \n" << NIS_laser_ <<endl;
 }
 
@@ -482,7 +482,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		Z_list.col(idx) = zpred_i;
 	}
 
-	cout << "Z_sig = \n" << Z_list << endl;
+	//cout << "Z_sig = \n" << Z_list << endl;
 
 	// Calculate mean z from points
 	VectorXd zpred = VectorXd(3);
@@ -492,7 +492,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		zpred += weights_(idx) * Z_list.col(idx);
 	}
 
-	cout << "Z_med = \n" << zpred << endl;
+	//cout << "Z_med = \n" << zpred << endl;
 
 	// Calculate S
 	MatrixXd S = MatrixXd(3, 3);
@@ -512,7 +512,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	S(1, 1) += std_radphi_ * std_radphi_;
 	S(2, 2) += std_radrd_  * std_radrd_;
 
-	cout << "S = \n" << S << endl;
+	//cout << "S = \n" << S << endl;
 
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 3);
@@ -536,7 +536,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
 
-	cout << "T = \n" << T << endl;
+	//cout << "T = \n" << T << endl;
 
 	// actual measurement
 	VectorXd zmeas = VectorXd(3);
@@ -544,12 +544,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	zmeas(1) = meas_package.raw_measurements_(1);
 	zmeas(2) = meas_package.raw_measurements_(2);
 
-	cout << "Zmeas = \n" << zmeas << endl;
+	//cout << "Zmeas = \n" << zmeas << endl;
 
 	VectorXd zinnov = VectorXd(3);
 	zinnov = zmeas - zpred;
 
-	cout << "Zinnov = \n" << zinnov << endl;
+	//cout << "Zinnov = \n" << zinnov << endl;
 
 	MatrixXd K = T * S.inverse();
 	x_ = x_ + K * zinnov;
@@ -562,8 +562,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	P_ = P_ - K * S * K.transpose();
 	NIS_radar_ = zinnov.transpose() * S.inverse() * zinnov;
 
-	cout << "K = \n" << K << endl;
-	cout << "X = \n" << x_ << endl;
-	cout << "P = \n" << P_ << endl;
+	//cout << "K = \n" << K << endl;
+	//cout << "X = \n" << x_ << endl;
+	//cout << "P = \n" << P_ << endl;
 	cout << "e radar = \n" << NIS_radar_ <<endl;
 }
