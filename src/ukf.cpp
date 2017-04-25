@@ -82,7 +82,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 	 */
 	if (!is_initialized_)
 	{
-		cout << "EKF: " << endl;
+		cout << "UKF: " << endl;
 
 		if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
 			/**
