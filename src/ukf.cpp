@@ -67,7 +67,7 @@ UKF::UKF() {
 			0, 0, 1, 0, 0,
 			0, 0, 0, 1, 0,
 			0, 0, 0, 0, 1;
-	P_ = 1 * P_;
+	P_ = .1 * P_;
 	//
 	n_x_ = 5;
 	n_aug_ = 7;
@@ -404,12 +404,19 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
 	MatrixXd K = T * S.inverse();
 	x_ = x_ + K * zinnov;
+
+	while ( x_(3) > M_PI )
+		x_(3) = x_(3) - M_PI;
+	while ( x_(3) < -M_PI )
+		x_(3) = x_(3) + M_PI;
+
 	P_ = P_ - K * S * K.transpose();
 	NIS_laser_ = zinnov.transpose() * S.inverse() * zinnov;
 
 	cout << "K = \n" << K << endl;
 	cout << "X = \n" << x_ << endl;
 	cout << "P = \n" << P_ << endl;
+	cout << "e laser = \n" << NIS_laser_ <<endl;
 }
 
 /**
@@ -536,4 +543,5 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	cout << "K = \n" << K << endl;
 	cout << "X = \n" << x_ << endl;
 	cout << "P = \n" << P_ << endl;
+	cout << "e radar = \n" << NIS_radar_ <<endl;
 }
