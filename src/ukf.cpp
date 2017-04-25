@@ -54,15 +54,20 @@ UKF::UKF() {
 	 */
 
 	is_initialized_ = false;
-	x_ << 	0, 0, 0, 0, 0;
-	P_ << 	0.15 * 0.15, 0, 0, 0, 0,
-			0, 0.15 * 0.15, 0, 0, 0,
-			0, 0, 1.00 * 1.00, 0, 0,
-			0, 0, 0, 0.10 * 0.10, 0,
-			0, 0, 0, 0, 0.20 * 0.20;
+
 	time_us_ = 0;
 	std_a_ = 3;
 	std_yawdd_ = 0.2;
+
+	x_ << 	0, 0, 0, 0, 0;
+
+	// Assume time delta
+	P_ << 	1, 0, 0, 0, 0,
+			0, 1, 0, 0, 0,
+			0, 0, 1, 0, 0,
+			0, 0, 0, 1, 0,
+			0, 0, 0, 0, 1;
+	P_ = 1 * P_;
 	//
 	n_x_ = 5;
 	n_aug_ = 7;
@@ -204,7 +209,7 @@ void UKF::Prediction(double delta_t) {
 	cout << "xsigorig = \n" << Xsig_pred_aug << endl;
 
 	// Pass the sigma points through model
-	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd point = Xsig_pred_aug.col(idx);
 
@@ -263,7 +268,7 @@ void UKF::Prediction(double delta_t) {
 	}
 
 	// Revert to lower dimensionality
-	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd point = VectorXd(5);
 		VectorXd point_aug = VectorXd(7);
@@ -294,7 +299,7 @@ void UKF::Prediction(double delta_t) {
 	// Calculate new mean
 	VectorXd x_pred = x_;
 	x_pred << 0, 0, 0, 0, 0;
-	for ( unsigned int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		x_pred += weights_(idx) * Xsig_pred_.col(idx);
 	}
@@ -302,7 +307,7 @@ void UKF::Prediction(double delta_t) {
 	// Calculate new P
 	MatrixXd P_new = P_;
 	P_new.setZero();
-	for ( unsigned int idx = 0; idx < 1 + 2* n_aug_; idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff =  Xsig_pred_.col(idx) - x_pred;
 		P_new += weights_(idx) * x_diff * x_diff.transpose();
@@ -330,63 +335,81 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
 	 */
-	std::vector<VectorXd> Z_list;
-	Z_list.resize(15);
-	VectorXd zpred = VectorXd(2);
+	MatrixXd Z_list;
+	Z_list = MatrixXd(2, 1 + 2 * n_aug_);
 
 	// From all sigma points
 	for( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		// In the case of a lidar it is very simple
-		VectorXd zpred_i = VectorXd(2);
-		VectorXd xpred_i = Xsig_pred_.col(idx);
+		VectorXd x_sigma;
+		x_sigma = VectorXd(5);
+		x_sigma = Xsig_pred_.col(idx);
 
-		zpred_i(0) = xpred_i(0);
-		zpred_i(1) = xpred_i(1);
-
-		Z_list[idx] = zpred_i;
+		// The laser model is just [I_2,2, O_2,3]
+		VectorXd x_model;
+		x_model = VectorXd(2);
+		x_model(0) = x_sigma(0);
+		x_model(1) = x_sigma(1);
+		Z_list.col(idx) = x_model;
 	}
+
+	cout << "Z_sig = \n" << Z_list << endl;
 
 	// Calculate mean z from points
+	VectorXd zpred = VectorXd(2);
 	zpred << 0, 0;
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		zpred += weights_(idx) * Z_list[idx];
+		zpred += weights_(idx) * Z_list.col(idx);
 	}
+
+	cout << "Z_med = \n" << zpred << endl;
 
 	// Calculate S
 	MatrixXd S = MatrixXd(2, 2);
 	S.setZero();
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		VectorXd z_diff = Z_list[idx] - zpred;
+		VectorXd z_diff = Z_list.col(idx) - zpred;
 		S += weights_(idx) * z_diff * z_diff.transpose();
 	}
 	S(0, 0) += std_laspx_ * std_laspx_;
 	S(1, 1) += std_laspy_ * std_laspy_;
 
+	cout << "S = \n" << S << endl;
+
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 2);
 	T.setZero();
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
-		VectorXd z_diff = Z_list[idx] - zpred;
+		VectorXd z_diff = Z_list.col(idx) - zpred;
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
+
+	cout << "T = \n" << T << endl;
 
 	// actual measurement
 	VectorXd zmeas = VectorXd(2);
 	zmeas(0) = meas_package.raw_measurements_(0);
 	zmeas(1) = meas_package.raw_measurements_(1);
 
+	cout << "Zmeas = \n" << zmeas << endl;
+
 	VectorXd zinnov = VectorXd(2);
 	zinnov = zmeas - zpred;
 
+	cout << "Zinnov = \n" << zinnov << endl;
+
 	MatrixXd K = T * S.inverse();
 	x_ = x_ + K * zinnov;
-	P_ = P_ + K * S * K.transpose();
+	P_ = P_ - K * S * K.transpose();
 	NIS_laser_ = zinnov.transpose() * S.inverse() * zinnov;
+
+	cout << "K = \n" << K << endl;
+	cout << "X = \n" << x_ << endl;
+	cout << "P = \n" << P_ << endl;
 }
 
 /**
@@ -402,22 +425,22 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
 	 */
-	std::vector<VectorXd> Z_list;
-	Z_list.resize(15);
-	// From x_ mean, but this is not used! ok.
-	VectorXd zpred = VectorXd(3);
+	MatrixXd Z_list;
+	Z_list = MatrixXd(3, 1 + 2 * n_aug_);
 
 	// From all sigma points
 	for( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		// In the case of a lidar it is very simple
-		VectorXd zpred_i = VectorXd(3);
-		VectorXd xpred_i = Xsig_pred_.col(idx);
+		VectorXd x_sigma;
+		x_sigma = VectorXd(5);
+		x_sigma = Xsig_pred_.col(idx);
 
-		float px  = xpred_i(0);
-		float py  = xpred_i(1);
-		float v   = xpred_i(2);
-		float yaw = xpred_i(3);
+		VectorXd zpred_i = VectorXd(3);
+
+		float px  = x_sigma(0);
+		float py  = x_sigma(1);
+		float v   = x_sigma(2);
+		float yaw = x_sigma(3);
 
 		if ( abs(px) < 1e-3 && abs(py) < 1e-3 )
 		{
@@ -425,30 +448,35 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 			py = 1e-3 * copysign(1.0, py);
 		}
 
-		float rho = sqrt(px * px + py * py);
-		float phi = atan2(py, px);
+		float rho  = sqrt(px * px + py * py);
+		float phi  = atan2(py, px);
 		float drho = (px * cos(yaw) * v + py * sin(yaw) * v) / rho;
 
 		zpred_i(0) = rho;
 		zpred_i(1) = phi;
 		zpred_i(2) = drho;
 
-		Z_list[idx] = zpred_i;
+		Z_list.col(idx) = zpred_i;
 	}
 
+	cout << "Z_sig = \n" << Z_list << endl;
+
 	// Calculate mean z from points
+	VectorXd zpred = VectorXd(3);
 	zpred << 0, 0, 0;
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		zpred += weights_(idx) * Z_list[idx];
+		zpred += weights_(idx) * Z_list.col(idx);
 	}
+
+	cout << "Z_med = \n" << zpred << endl;
 
 	// Calculate S
 	MatrixXd S = MatrixXd(3, 3);
 	S.setZero();
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
-		VectorXd z_diff = Z_list[idx] - zpred;
+		VectorXd z_diff = Z_list.col(idx) - zpred;
 
 		while ( z_diff(1) > M_PI )
 			z_diff(1) = z_diff(1) - M_PI;
@@ -461,13 +489,15 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	S(1, 1) += std_radphi_ * std_radphi_;
 	S(2, 2) += std_radrd_  * std_radrd_;
 
+	cout << "S = \n" << S << endl;
+
 	// Calculate T
 	MatrixXd T = MatrixXd(5, 3);
 	T.setZero();
-	for ( unsigned int idx = 0; idx < Z_list.size(); idx++ )
+	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
-		VectorXd z_diff = Z_list[idx] - zpred;
+		VectorXd z_diff = Z_list.col(idx) - zpred;
 
 		while ( z_diff(1) > M_PI )
 			z_diff(1) = z_diff(1) - M_PI;
@@ -477,14 +507,20 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
 
+	cout << "T = \n" << T << endl;
+
 	// actual measurement
 	VectorXd zmeas = VectorXd(3);
 	zmeas(0) = meas_package.raw_measurements_(0);
 	zmeas(1) = meas_package.raw_measurements_(1);
 	zmeas(2) = meas_package.raw_measurements_(2);
 
+	cout << "Zmeas = \n" << zmeas << endl;
+
 	VectorXd zinnov = VectorXd(3);
 	zinnov = zmeas - zpred;
+
+	cout << "Zinnov = \n" << zinnov << endl;
 
 	MatrixXd K = T * S.inverse();
 	x_ = x_ + K * zinnov;
@@ -494,6 +530,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	while ( x_(3) < -M_PI )
 		x_(3) = x_(3) + M_PI;
 
-	P_ = P_ + K * S * K.transpose();
-	NIS_laser_ = zinnov.transpose() * S.inverse() * zinnov;
+	P_ = P_ - K * S * K.transpose();
+	NIS_radar_ = zinnov.transpose() * S.inverse() * zinnov;
+
+	cout << "K = \n" << K << endl;
+	cout << "X = \n" << x_ << endl;
+	cout << "P = \n" << P_ << endl;
 }
