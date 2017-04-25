@@ -50,7 +50,7 @@ UKF::UKF() {
 	is_initialized_ = false;
 
 	time_us_ = 0;
-	std_a_ = 3;
+	std_a_ = 2;
 	std_yawdd_ = 0.9;
 
 	x_ << 	0, 0, 0, 0, 0;
@@ -133,8 +133,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 	// We can get better predictions by a small step update
 	while ( dt > 0.1 )
 	{
-		Prediction(0.1);
-		dt -= 0.1;
+		Prediction(0.05);
+		dt -= 0.05;
 	}
 	Prediction(dt);
 
@@ -215,6 +215,12 @@ void UKF::Prediction(double delta_t) {
 		float dt2 = delta_t * delta_t;
 
 		// assign init original values to predictions
+		float px   = point(0);
+		float py   = point(1);
+		float v    = point(2);
+		float yaw  = point(3);
+		float dyaw = point(4);
+
 		float px_pred   = point(0);
 		float py_pred   = point(1);
 		float v_pred    = point(2);
@@ -228,8 +234,6 @@ void UKF::Prediction(double delta_t) {
 		{
 			// Assume 0 yaw rate locally, though only for calculation, old value will
 			// be carried over
-			dyaw_pred = 0.0f;
-
 			px_pred   += v_pred * cos(yaw_pred) + v_pred * cos(yaw_pred) * delta_t;
 			py_pred   += v_pred * sin(yaw_pred) + v_pred * sin(yaw_pred) * delta_t;
 			v_pred    += 0;
@@ -248,8 +252,8 @@ void UKF::Prediction(double delta_t) {
 		}
 
 		// add noise effect
-		px_pred 	+= 0.5 * dt2 * cos(yaw_pred) * va;
-		py_pred 	+= 0.5 * dt2 * sin(yaw_pred) * va;
+		px_pred 	+= 0.5 * dt2 * cos(yaw) * va;
+		py_pred 	+= 0.5 * dt2 * sin(yaw) * va;
 		v_pred  	+= delta_t * va;
 		yaw_pred 	+= 0.5 * dt2 * vyawdd;
 		dyaw_pred 	+= delta_t * vyawdd;
