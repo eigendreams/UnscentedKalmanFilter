@@ -50,8 +50,8 @@ UKF::UKF() {
 	is_initialized_ = false;
 
 	time_us_ = 0;
-	std_a_ = 2;
-	std_yawdd_ = 0.9;
+	std_a_ = 7;
+	std_yawdd_ = 1.2;
 
 	x_ << 	0, 0, 0, 0, 0;
 
