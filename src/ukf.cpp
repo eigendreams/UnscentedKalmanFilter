@@ -14,28 +14,22 @@ using std::vector;
 UKF::UKF() {
 	// if this is false, laser measurements will be ignored (except during init)
 	use_laser_ = true;
-
 	// if this is false, radar measurements will be ignored (except during init)
 	use_radar_ = true;
 
 	// initial state vector
 	x_ = VectorXd(5);
-
 	// initial covariance matrix
 	P_ = MatrixXd(5, 5);
 
 	// Laser measurement noise standard deviation position1 in m
 	std_laspx_ = 0.15;
-
 	// Laser measurement noise standard deviation position2 in m
 	std_laspy_ = 0.15;
-
 	// Radar measurement noise standard deviation radius in m
 	std_radr_ = 0.3;
-
 	// Radar measurement noise standard deviation angle in rad
 	std_radphi_ = 0.03;
-
 	// Radar measurement noise standard deviation radius change in m/s
 	std_radrd_ = 0.3;
 
@@ -48,27 +42,28 @@ UKF::UKF() {
 	 */
 
 	is_initialized_ = false;
-
 	time_us_ = 0;
+
+	// Obtained by trial and error
 	std_a_ = 7;
 	std_yawdd_ = 1.2;
 
 	x_ << 	0, 0, 0, 0, 0;
+	// From Udacity example
+	P_ <<  	0.0043,    -0.0013,     0.0030,   -0.0022,   -0.0020,
+		   -0.0013,     0.0077,    	0.0011,    0.0071,    0.0060,
+			0.0030,    	0.0011,    	0.0054,    0.0007,    0.0008,
+		   -0.0022,     0.0071,    	0.0007,    0.0098,    0.0100,
+		   -0.0020,     0.0060,    	0.0008,    0.0100,    0.0123;
 
-    P_ <<  0.0043,   -0.0013,    0.0030,   -0.0022,   -0.0020,
-          -0.0013,    0.0077,    0.0011,    0.0071,    0.0060,
-           0.0030,    0.0011,    0.0054,    0.0007,    0.0008,
-          -0.0022,    0.0071,    0.0007,    0.0098,    0.0100,
-          -0.0020,    0.0060,    0.0008,    0.0100,    0.0123;
-	//
 	n_x_ = 5;
 	n_aug_ = 7;
 	lambda_ = 3 - n_aug_;
 	weights_ = VectorXd(1 + 2 * n_aug_);
-	//
+
 	NIS_radar_ = 0;
 	NIS_laser_ = 0;
-	//
+
 	Xsig_pred_ = MatrixXd(n_x_, 1 + 2 * n_aug_);
 }
 
@@ -100,12 +95,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
 			float x = rho * cos(phi);
 			float y = rho * sin(phi);
-			// Using the chain rule, hopefully the compiler ignores the right side
 			float v = drho;
-			// assume 0 curvature and 0 curvature rate
 
-			// Set the state
 			x_ << x, y, v, phi, 0;
+
 			// In the spirit of the UKF, we will not get a Jacobian, and so
 			// we cannot get a better initialization at this point!
 		}
@@ -117,8 +110,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 			float  x = meas_package.raw_measurements_[0];
 			float  y = meas_package.raw_measurements_[1];
 
-			// Set the state
 			x_ << x, y, 0, 0, 0;
+
 			// In the spirit of the UKF, we will not get a Jacobian, and so
 			// we cannot get a better initialization at this point!
 		}
@@ -133,8 +126,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 	// We can get better predictions by a small step update
 	while ( dt > 0.1 )
 	{
-		Prediction(0.05);
-		dt -= 0.05;
+		Prediction(0.1);
+		dt -= 0.1;
 	}
 	Prediction(dt);
 
@@ -197,7 +190,6 @@ void UKF::Prediction(double delta_t) {
 	// Generate the sigma points
 	MatrixXd Xsig_pred_aug;
 	Xsig_pred_aug = MatrixXd(n_aug_, 1 + 2 * n_aug_);
-	// We will create points as vectors on the fly
 	Xsig_pred_aug.col(0) = x_pred_aug;
 	for ( int idx = 0; idx < n_aug_; idx ++ )
 	{
@@ -215,7 +207,7 @@ void UKF::Prediction(double delta_t) {
 		float dt2 = delta_t * delta_t;
 
 		// assign init original values to predictions
-		float yaw  = point(3);
+		float yaw = point(3);
 
 		float px_pred   = point(0);
 		float py_pred   = point(1);
@@ -286,12 +278,8 @@ void UKF::Prediction(double delta_t) {
 	//cout << "xsigpred = \n" << Xsig_pred_ << endl;
 
 	// Get middle points, first populate list of weights
+	weights_.fill(0.5 / (lambda_ + n_aug_));
 	weights_(0) = (lambda_ / (lambda_ + n_aug_));
-	for ( int idx = 0; idx < n_aug_; idx ++ )
-	{
-		weights_(1 + 2 * idx) 	  = (0.5 * 1 / (lambda_ + n_aug_));
-		weights_(1 + 2 * idx + 1) = (0.5 * 1 / (lambda_ + n_aug_));
-	}
 
 	//cout << "weights = \n" << weights_.transpose() << endl;
 
@@ -418,7 +406,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
 	//cout << "Zinnov = \n" << zinnov << endl;
 
-	MatrixXd K = T * S.inverse();
+	MatrixXd Sinv = S.inverse();
+
+	MatrixXd K = T * Sinv;
 	x_ = x_ + K * zinnov;
 
 	//while ( x_(3) > M_PI )
@@ -427,7 +417,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	//	x_(3) = x_(3) + 2 * M_PI;
 
 	P_ = P_ - K * S * K.transpose();
-	NIS_laser_ = zinnov.transpose() * S.inverse() * zinnov;
+	NIS_laser_ = zinnov.transpose() * Sinv * zinnov;
 
 	//cout << "K = \n" << K << endl;
 	//cout << "X = \n" << x_ << endl;
@@ -551,7 +541,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
 	//cout << "Zinnov = \n" << zinnov << endl;
 
-	MatrixXd K = T * S.inverse();
+	MatrixXd Sinv = S.inverse();
+
+	MatrixXd K = T * Sinv;
 	x_ = x_ + K * zinnov;
 
 	//while ( x_(3) > M_PI )
@@ -560,7 +552,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	//	x_(3) = x_(3) + 2 * M_PI;
 
 	P_ = P_ - K * S * K.transpose();
-	NIS_radar_ = zinnov.transpose() * S.inverse() * zinnov;
+	NIS_radar_ = zinnov.transpose() * Sinv * zinnov;
 
 	//cout << "K = \n" << K << endl;
 	//cout << "X = \n" << x_ << endl;
