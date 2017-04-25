@@ -67,7 +67,7 @@ UKF::UKF() {
 			0, 0, 1, 0, 0,
 			0, 0, 0, 1, 0,
 			0, 0, 0, 0, 1;
-	P_ = .1 * P_;
+	P_ = 1 * P_;
 	//
 	n_x_ = 5;
 	n_aug_ = 7;
@@ -225,7 +225,7 @@ void UKF::Prediction(double delta_t) {
 		float va        = point(5);
 		float vyawdd    = point(6);
 
-		if ( abs(dyaw_pred) < 1e-3 )
+		if ( abs(dyaw_pred) < 1e-4 )
 		{
 			// Assume 0 yaw rate locally, though only for calculation, old value will
 			// be carried over
@@ -304,12 +304,23 @@ void UKF::Prediction(double delta_t) {
 		x_pred += weights_(idx) * Xsig_pred_.col(idx);
 	}
 
+	while ( x_pred(3) > M_PI )
+		x_pred(3) = x_pred(3) - M_PI;
+	while ( x_pred(3) < -M_PI )
+		x_pred(3) = x_pred(3) + M_PI;
+
 	// Calculate new P
 	MatrixXd P_new = P_;
 	P_new.setZero();
 	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff =  Xsig_pred_.col(idx) - x_pred;
+
+		while ( x_diff(3) > M_PI )
+			x_diff(3) = x_diff(3) - M_PI;
+		while ( x_diff(3) < -M_PI )
+			x_diff(3) = x_diff(3) + M_PI;
+
 		P_new += weights_(idx) * x_diff * x_diff.transpose();
 	}
 
@@ -384,6 +395,12 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
+
+		while ( x_diff(3) > M_PI )
+			x_diff(3) = x_diff(3) - M_PI;
+		while ( x_diff(3) < -M_PI )
+			x_diff(3) = x_diff(3) + M_PI;
+
 		VectorXd z_diff = Z_list.col(idx) - zpred;
 		T += weights_(idx) * x_diff * z_diff.transpose();
 	}
