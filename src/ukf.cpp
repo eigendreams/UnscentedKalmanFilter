@@ -113,7 +113,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 			// assume 0 curvature and 0 curvature rate
 
 			// Set the state
-			x_ << x, y, v, 0, 0;
+			x_ << x, y, v, phi, 0;
 			// In the spirit of the UKF, we will not get a Jacobian, and so
 			// we cannot get a better initialization at this point!
 		}
