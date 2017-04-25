@@ -215,11 +215,7 @@ void UKF::Prediction(double delta_t) {
 		float dt2 = delta_t * delta_t;
 
 		// assign init original values to predictions
-		float px   = point(0);
-		float py   = point(1);
-		float v    = point(2);
 		float yaw  = point(3);
-		float dyaw = point(4);
 
 		float px_pred   = point(0);
 		float py_pred   = point(1);
@@ -524,6 +520,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	for ( int idx = 0; idx < 1 + 2 * n_aug_; idx++ )
 	{
 		VectorXd x_diff = Xsig_pred_.col(idx) - x_;
+
+		while ( x_diff(3) > M_PI )
+			x_diff(3) = x_diff(3) - 2 * M_PI;
+		while ( x_diff(3) < -M_PI )
+			x_diff(3) = x_diff(3) + 2 * M_PI;
+
 		VectorXd z_diff = Z_list.col(idx) - zpred;
 
 		while ( z_diff(1) > M_PI )
