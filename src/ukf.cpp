@@ -143,8 +143,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 	time_us_ = meas_package.timestamp_;
 
 	// print the output
-	//cout << "x_ = " << x_ << endl;
-	//cout << "P_ = " << P_ << endl;
+	cout << "x_ = \n" << x_ << endl;
+	cout << "P_ = \n" << P_ << endl;
 }
 
 /**
